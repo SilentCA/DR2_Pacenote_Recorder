@@ -1,24 +1,35 @@
 #!/usr/bin/env python3
 
 from vosk import Model, KaldiRecognizer, SetLogLevel
-import sys
-import os
 import wave
 import json
+import csv
+import pathlib
 
 SetLogLevel(0)
 
-if not os.path.exists("model"):
-    print ("Please download the model from https://alphacephei.com/vosk/models and unpack as 'model' in the current folder.")
-    exit (1)
+Model_PATH = "../vosk-model-en-us-0.22"
 
-wf = wave.open(sys.argv[1], "rb")
+
+# Load all speeches
+speeches = []
+with open('aliases.csv', newline='') as f:
+    speech_reader = csv.reader(f)
+    # skip first header line
+    speech_reader.__next__()
+    for line in speech_reader:
+        speech = line[-1].split('|')
+        speeches.extend(speech)
+
+
+wf_filename = input("Please input pacenotes audio filename:")
+wf = wave.open(wf_filename, "rb")
 if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
     print ("Audio file must be WAV format mono PCM.")
     exit (1)
 
-model = Model("model")
-rec = KaldiRecognizer(model, wf.getframerate())
+model = Model(Model_PATH)
+rec = KaldiRecognizer(model, wf.getframerate(), json.dumps(speeches))
 rec.SetWords(True)
 
 results = []
@@ -42,6 +53,10 @@ for res in results:
     words = jres['result']
     content = " ".join([w['word'] for w in words])
     start = words[0]['start']
-    pacenotes.append([start, content])
+    pacenotes.append([start, start, content])
 
+p_filename = pathlib.Path(wf_filename).with_suffix('.csv')
+with open(p_filename, "w", newline="") as f:
+    f_csv = csv.writer(f, delimiter='\t')
+    f_csv.writerows(pacenotes)
 # print(rec.FinalResult())
